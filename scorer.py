@@ -1,5 +1,5 @@
 from typing import Dict
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from schemas import ResumeExtract, HRDecision
 
@@ -58,3 +58,4 @@ def scorer_node(state: Dict) -> Dict:
         "improvements": result.improvements,
         "score": result.score.model_dump(),  # total 키 포함
     }
+
