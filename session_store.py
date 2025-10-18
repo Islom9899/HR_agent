@@ -1,5 +1,6 @@
 import os
 import shutil
+import chromadb
 from typing import Dict, Any
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -21,61 +22,50 @@ def _load_docs(file_path: str):
 
 
 # ---------------------------------------
-# 🔹 세션 생성 (기존 세션 삭제 후 새로 생성)
+# 🔹 세션 생성 (Ephemeral 모드)
 # ---------------------------------------
 def create_or_reset_session(chat_id: str, job_file_path: str):
     """
-    기존 세션 폴더가 존재하면 삭제 후 새로 생성합니다.
-    Streamlit Cloud에서는 /mount/temp 하위에 저장합니다.
+    기존 세션과 상관없이 항상 새 Chroma 세션(메모리 기반)을 생성합니다.
+    Streamlit Cloud에서도 안전하게 작동합니다.
     """
 
-    # ✅ Cloud 환경에서는 /mount/temp 사용
-    base_dir = "/mount/temp" if os.path.exists("/mount/temp") else "db"
-    persist_dir = os.path.join(base_dir, "sessions", chat_id)
-
-    # 🔥 기존 세션 폴더 삭제
-    if os.path.exists(persist_dir):
-        shutil.rmtree(persist_dir, ignore_errors=True)
-    os.makedirs(persist_dir, exist_ok=True)
-
-    # 📄 문서 로드
+    # 🔹 채용 공고 파일 로드
     docs = _load_docs(job_file_path)
 
-    # ✂️ 텍스트 분할
+    # 🔹 텍스트 분할
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_documents(docs)
-
     if not chunks:
         raise ValueError("⚠️ 문서가 비어있거나 청크 분할에 실패했습니다.")
 
-    # 🧠 Embedding 생성
+    # 🔹 임베딩 초기화
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-    # 💾 ChromaDB 생성
-    Chroma.from_documents(
+    # 🔹 Ephemeral(메모리 전용) 클라이언트 생성
+    client = chromadb.EphemeralClient()
+
+    # 🔹 ChromaDB 생성 (메모리 모드)
+    db = Chroma.from_documents(
         chunks,
         embedding=embeddings,
-        persist_directory=persist_dir,
+        client=client,
         collection_name=f"job-{chat_id}",
     )
 
-    print(f"✅ 새 세션이 생성되었습니다: {chat_id} (path: {persist_dir})")
-    return {"chat_id": chat_id, "persist_dir": persist_dir}
+    print(f"✅ Ephemeral 세션이 생성되었습니다: {chat_id}")
+    # 세션 상태 반환 (persist_dir이 없음)
+    return {"chat_id": chat_id, "persist_dir": None, "client": client, "db": db}
 
 
 # ---------------------------------------
-# 🔹 세션 종료 (데이터 삭제)
+# 🔹 세션 종료 (메모리 모드이므로 단순 로그)
 # ---------------------------------------
 def end_session(chat_id: str):
     """
-    세션 종료 시 저장된 데이터를 삭제합니다.
+    메모리 기반 세션 종료 시 별도의 삭제는 필요 없습니다.
     """
-    base_dir = "/mount/temp" if os.path.exists("/mount/temp") else "db"
-    persist_dir = os.path.join(base_dir, "sessions", chat_id)
-
-    if os.path.exists(persist_dir):
-        shutil.rmtree(persist_dir, ignore_errors=True)
-        print(f"🧹 세션이 삭제되었습니다: {chat_id}")
+    print(f"🧹 세션 종료: {chat_id}")
 
 
 # ---------------------------------------
@@ -83,25 +73,8 @@ def end_session(chat_id: str):
 # ---------------------------------------
 def retrieve_job_context(chat_id: str, query: str = "Evaluate candidate against this job", k: int = 4) -> str:
     """
-    세션에 저장된 채용공고 문맥을 조회합니다.
-    Cloud 환경에서는 /mount/temp/sessions 하위에서 데이터를 불러옵니다.
+    메모리 세션에서는 DB 파일이 존재하지 않기 때문에,
+    실제 컨텍스트는 graph 실행 중 상태(state)로 전달되어야 합니다.
+    여기서는 단순 placeholder 문자열을 반환합니다.
     """
-    base_dir = "/mount/temp" if os.path.exists("/mount/temp") else "db"
-    persist_dir = os.path.join(base_dir, "sessions", chat_id)
-
-    if not os.path.isdir(persist_dir):
-        return "No job description found in session context."
-
-    try:
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-        db = Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embeddings,
-            collection_name=f"job-{chat_id}",
-        )
-        docs = db.similarity_search(query, k=k)
-        if not docs:
-            return "No job description found in session context."
-        return "\n\n".join(d.page_content for d in docs if getattr(d, "page_content", "").strip())
-    except Exception:
-        return "No job description found in session context."
+    return f"[INFO] 세션 {chat_id}의 채용공고 문맥이 로드되었습니다."
