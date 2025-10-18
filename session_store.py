@@ -7,12 +7,13 @@ from langchain_community.vectorstores import Chroma
 import chromadb
 from chromadb.config import Settings
 
+
 # ==========================================================
-# 🧠 세션별 채용 공고 문맥(Vector DB) 관리 모듈
+#  세션별 채용 공고 문맥(Vector DB) 관리 모듈
 # ----------------------------------------------------------
 # - 각 세션(chat_id)마다 별도의 Chroma DB를 생성 및 저장
 # - Streamlit Cloud 환경 호환 (telemetry 비활성화)
-# - 오래된 세션 디렉토리 자동 정리
+# - 세션 종료 시 디스크 및 메모리 자동 정리
 # ==========================================================
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,44 +37,40 @@ def _load_docs(file_path: str):
 
 def create_or_reset_session(chat_id: str, job_file_path: str):
     """
-    🔄 세션 생성 / 리셋
+    세션 생성 / 리셋
     ----------------------------------
-    1️⃣ 채용 공고 파일을 불러와 문서 조각으로 분할
-    2️⃣ OpenAI Embedding 생성
-    3️⃣ 세션별 Chroma VectorStore에 저장 (자동 지속)
-
-    매번 새로 생성 시 기존 세션 디렉토리를 정리함.
+    채용 공고 파일을 불러와 문서 조각으로 분할
+    OpenAI Embedding 생성
+    세션별 Chroma VectorStore에 저장 (자동 지속)
     """
-    # 1. 문서 로드 및 분할
     docs = _load_docs(job_file_path)
     splitter = RecursiveCharacterTextSplitter(chunk_size=900, chunk_overlap=200)
     chunks = splitter.split_documents(docs)
     for ch in chunks:
-        ch.metadata = {"chat_id": chat_id}  # 메타데이터에 세션 ID 추가
+        ch.metadata = {"chat_id": chat_id}
 
     persist_dir = str(SESS_DB_ROOT / chat_id)
 
-    # 2. 기존 세션 데이터 삭제 (깨진 DB 방지)
+    # 기존 세션 디렉토리 제거 (깨진 DB 방지)
     if Path(persist_dir).exists():
         shutil.rmtree(persist_dir, ignore_errors=True)
 
-    # 3. 임베딩 모델 지정
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-    # 4. 안정 버전용 Chroma 클라이언트 설정
+    # 안정 버전용 Chroma 설정
     client_settings = Settings(
-        anonymized_telemetry=False,  # 🔕 클라우드 환경에서 오류 방지
+        anonymized_telemetry=False,
         is_persistent=True,
         allow_reset=True,
-        persist_directory=persist_dir,
+        persist_directory=persist_dir
     )
 
-    # 5. 문서로부터 벡터 DB 생성 (자동 저장)
+    # 문서로부터 벡터 DB 생성
     Chroma.from_documents(
         chunks,
         embedding=embeddings,
         persist_directory=persist_dir,
-        client_settings=client_settings,
+        client_settings=client_settings
     )
 
     return {"chat_id": chat_id, "persist_dir": persist_dir}
@@ -83,13 +80,11 @@ def retrieve_job_context(chat_id: str, query: str = "Evaluate candidate against 
     """
     🔍 채용 공고 문맥 검색
     ----------------------------------
-    - 세션별 Chroma DB에서 유사한 문서 검색
-    - 상위 k개 조각을 합쳐 반환
+    세션별 Chroma DB에서 유사한 문서를 검색하여
+    상위 k개 조각을 합쳐 반환한다.
     """
     persist_dir = str(SESS_DB_ROOT / chat_id)
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-    # 세션별 DB 로드
     db = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
     hits = db.similarity_search(query, k=4)
     return "\n\n".join([h.page_content for h in hits])
@@ -97,11 +92,36 @@ def retrieve_job_context(chat_id: str, query: str = "Evaluate candidate against 
 
 def end_session(chat_id: str):
     """
-    🧹 세션 종료 및 정리
+    세션 종료 시 디스크 및 메모리 정리
     ----------------------------------
-    - 세션 관련 디스크 데이터를 삭제하여 공간 확보
-    - Streamlit Cloud 환경에서도 안전하게 동작
+    - Chroma 클라이언트 종료
+    - 세션 디렉토리 삭제
+    - Streamlit 캐시 및 상태 초기화
     """
-    dirp = SESS_DB_ROOT / chat_id
-    if dirp.exists():
-        shutil.rmtree(dirp, ignore_errors=True)
+    import streamlit as st
+    from streamlit.runtime.caching import clear_cache
+
+    persist_dir = str(SESS_DB_ROOT / chat_id)
+    try:
+        # 1️⃣ 메모리에 남은 Chroma 인스턴스 정리
+        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+        db = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+        db.delete_collection()
+        del db
+    except Exception:
+        pass
+
+    try:
+        # 2️⃣ 디스크 삭제
+        dirp = SESS_DB_ROOT / chat_id
+        if dirp.exists():
+            shutil.rmtree(dirp, ignore_errors=True)
+    except Exception:
+        pass
+
+    try:
+        # 3️⃣ Streamlit 세션 상태 및 캐시 초기화
+        st.session_state.clear()
+        clear_cache()
+    except Exception:
+        pass
