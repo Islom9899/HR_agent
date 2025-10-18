@@ -13,6 +13,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# 🔧 --- AUTO CLEANER: ChromaDB ---
+CLEAN_DIR = Path(__file__).resolve().parent / "db" / "sessions"
+if CLEAN_DIR.exists():
+    try:
+        shutil.rmtree(CLEAN_DIR, ignore_errors=True)
+        CLEAN_DIR.mkdir(parents=True, exist_ok=True)
+        print("✅ Old Chroma sessions cleared successfully.")
+    except Exception as e:
+        print(f"⚠️ Cleanup failed: {e}")
+# -------------------------------------------------------------
+
 # Streamlit 페이지 설정
 st.set_page_config(
     page_title="HR AI Screening Agent",
@@ -163,52 +174,3 @@ with tab1:
 
             st.markdown("---")
             st.json({k: v for k, v in state.items() if k not in ["resume_text"]})
-
-# ============ 탭 2: 일괄 스크리닝 ============
-with tab2:
-    st.subheader("📦 여러 이력서 일괄 평가")
-    if "chat_id" not in st.session_state:
-        st.info("먼저 세션을 생성하세요.")
-    else:
-        files = st.file_uploader("이력서들 (.pdf/.txt)", type=["pdf", "txt"], accept_multiple_files=True)
-        run_batch = st.button("🚀 일괄 평가")
-        if run_batch and files:
-            compiled = ensure_graph()
-            rows: List[Dict[str, Any]] = []
-            with st.spinner("일괄 평가 중..."):
-                for f in files:
-                    try:
-                        rp = save_upload(f, RES_DIR / st.session_state["chat_id"])
-                        s = compiled.invoke({"chat_id": st.session_state["chat_id"], "resume_path": rp})
-                        score = s.get("score") or {}
-                        total = score.get("total") if isinstance(score, dict) else None
-                        rows.append({
-                            "file": Path(rp).name,
-                            "decision": s.get("decision", ""),
-                            "total": total,
-                            "reasons": json.dumps(s.get("reasons", []), ensure_ascii=False),
-                        })
-                    except Exception as e:
-                        rows.append({"file": f.name, "decision": "ERROR", "total": "", "reasons": str(e)})
-            if rows:
-                df = pd.DataFrame(rows)
-                st.dataframe(df, use_container_width=True, hide_index=True)
-                csv = df.to_csv(index=False).encode("utf-8")
-                st.download_button("⬇️ CSV로 다운로드", csv, "screenings.csv", "text/csv")
-
-# ============ 탭 3: 히스토리 / CSV ============
-with tab3:
-    st.subheader("📊 히스토리")
-    if "chat_id" not in st.session_state:
-        st.info("세션을 생성하세요.")
-    else:
-        sess_dir = RES_DIR / st.session_state["chat_id"]
-        if not sess_dir.exists():
-            st.write("아직 파일이 없습니다.")
-        else:
-            files = sorted(sess_dir.glob("*"))
-            st.write(f"**{st.session_state['chat_id']}** 세션의 이력서 목록:")
-            for f in files:
-                st.markdown(f"- `{f.name}`")
-    st.caption("CSV 파일은 일괄 스크리닝 탭에서 내려받을 수 있습니다.")
-
