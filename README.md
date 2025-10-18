@@ -1,6 +1,11 @@
 # 🧠 HR AI Screening Agent   
 > AI-driven resume screening system built with **LangGraph**, **LangChain**, **OpenAI GPT-4o-mini**, and **Streamlit**.  
 > 인공지능 기반 이력서 자동 평가 시스템 — 채용 담당자의 스크리닝 과정을 완전히 자동화합니다.
+> 
+---
+## 🚀 Live Demo
+
+👉 [**Try the App on Streamlit**](https://hragent-new.streamlit.app/)  
 
 ---
 
