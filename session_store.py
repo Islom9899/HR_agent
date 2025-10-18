@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 
@@ -57,4 +57,5 @@ def end_session(chat_id: str):
     dirp = SESS_DB_ROOT / chat_id
     if dirp.exists():
         shutil.rmtree(dirp, ignore_errors=True)
+
 
