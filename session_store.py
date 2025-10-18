@@ -1,3 +1,5 @@
+import os
+import shutil
 from typing import Dict, Any
 from langchain_community.vectorstores import Chroma
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -124,3 +126,4 @@ def retrieve_job_context(chat_id: str, query: str = "Evaluate candidate against 
     except Exception as e:
         print(f"⚠️ retrieve_job_context 에러: {e}")
         return "No job description found in session context."
+
