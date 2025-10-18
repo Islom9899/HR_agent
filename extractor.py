@@ -1,5 +1,5 @@
 from typing import Dict
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from schemas import ResumeExtract
 from dotenv import load_dotenv
@@ -41,3 +41,4 @@ def extractor_node(state: Dict) -> Dict:
     """
     extracted: ResumeExtract = extract_chain.invoke({'resume_text': state['resume_text']})
     return {"extracted": extracted}
+
