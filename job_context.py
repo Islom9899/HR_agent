@@ -1,59 +1,24 @@
-import os
-from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
+from typing import Dict
+from session_store import retrieve_job_context
 
-
-# -------------------------------------------------
-# 🔹 채용공고 문맥 불러오기
-# -------------------------------------------------
-def job_context_node(chat_id: str, query: str = "지원자 이력서를 이 채용공고에 맞춰 평가하세요.", k: int = 4) -> str:
+def job_context_node(state: Dict) -> Dict:
     """
-    [KO] 세션에 저장된 채용공고 문맥(Job Context)을 검색하여 반환합니다.
-
-    Args:
-        chat_id (str): 세션 ID (예: "hr_chat_001")
-        query (str): 검색 쿼리 (기본값은 HR 평가용)
-        k (int): 검색할 문서의 개수 (유사도 상위 k개)
-
-    Returns:
-        str: 채용공고의 핵심 문맥 (없을 경우 기본 안내 메시지)
+    채용 공고 문맥 노드
+    - 세션 ID(chat_id)를 기반으로 저장된 벡터 DB(Chroma)에서
+      채용 공고 문맥을 검색하여 job_description 필드로 반환한다.
+    
+    입력:
+        state["chat_id"]: 세션 ID
+    출력:
+        {"job_description": str}
     """
+    chat_id = state.get("chat_id")
+    if not chat_id:
+        raise ValueError("chat_id가 누락되었습니다. 세션이 생성되지 않았습니다.")
 
-    # 🌐 환경에 따라 세션 디렉토리 경로 설정
-    base_dir = "/mount/temp" if os.path.exists("/mount/temp") else "db"
-    persist_dir = os.path.join(base_dir, "sessions", chat_id)
+    # 세션 DB에서 채용 공고 문맥 검색
+    job_desc = retrieve_job_context(chat_id)
+    if not job_desc or len(job_desc.strip()) == 0:
+        job_desc = "No job description found in session context."
 
-    # 📁 세션 폴더 확인
-    if not os.path.isdir(persist_dir):
-        print(f"⚠️ 세션 데이터가 존재하지 않습니다: {persist_dir}")
-        return "No job description found in session context."
-
-    try:
-        # 🧠 Embedding 모델 (session_store.py와 동일)
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-        # 💾 ChromaDB에서 데이터 로드
-        db = Chroma(
-            persist_directory=persist_dir,
-            embedding_function=embeddings,
-            collection_name=f"job-{chat_id}",
-        )
-
-        # 🔍 유사도 검색 (job context)
-        docs = db.similarity_search(query, k=k)
-
-        # 📄 결과 텍스트 병합
-        if not docs:
-            print(f"⚠️ 채용공고 문맥을 찾을 수 없습니다. (chat_id: {chat_id})")
-            return "No job description found in session context."
-
-        context_text = "\n\n".join(
-            d.page_content for d in docs if getattr(d, "page_content", "").strip()
-        )
-
-        print(f"✅ 채용공고 문맥 로드 완료 (chat_id: {chat_id})")
-        return context_text
-
-    except Exception as e:
-        print(f"⚠️ job_context_node 오류 발생: {e}")
-        return "No job description found in session context."
+    return {"job_description": job_desc}
