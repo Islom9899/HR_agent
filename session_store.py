@@ -36,7 +36,7 @@ def create_or_reset_session(chat_id: str, job_file_path: str):
     persist_dir = str(SESS_DB_ROOT / chat_id)
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     # 최신 Chroma에서는 .persist() 호출 없이도 자동 지속 저장
-    Chroma.from_documents(chunks, embedding=embeddings, persist_directory=persist_dir)
+    Chroma.from_documents(chunks, embedding=embeddings, persist_directory=None)
     return {"chat_id": chat_id, "persist_dir": persist_dir}
 
 def retrieve_job_context(chat_id: str, query: str = "Evaluate candidate against this job"):
@@ -57,6 +57,7 @@ def end_session(chat_id: str):
     dirp = SESS_DB_ROOT / chat_id
     if dirp.exists():
         shutil.rmtree(dirp, ignore_errors=True)
+
 
 
 
