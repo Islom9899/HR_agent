@@ -14,7 +14,7 @@
 **HR AI Screening Agent**는 지원자의 이력서를 채용 공고와 자동으로 비교하여,  
 경험·기술·학력 적합도를 정량적으로 평가하는 **AI HR 스크리닝 시스템**입니다.  
 
-이 프로젝트는 **LangGraph 워크플로우**, **GPT-4o-mini**, **ChromaDB**,  
+이 프로젝트는 **LangGraph 워크플로우**, **GPT-4o-mini**, **FAISS**,  
 그리고 **Streamlit**을 이용해 실제 HR 프로세스를 자동화한 형태로 제작되었습니다.  
 
 ---
@@ -26,7 +26,7 @@
 | 🧩 **LangGraph Workflow** | `defaults → job_context → loader → extractor → scorer` 구조로 구성된 완전한 HR 그래프 파이프라인 |
 | 🤖 **AI Resume Extraction** | GPT-4o-mini를 활용해 이력서의 핵심 정보를 구조화(name, skills, experience 등) |
 | 📊 **Automated Scoring** | Must-have / Nice-to-have 스킬, 경력 연차, 전공 적합도를 기반으로 점수화 (0–100) |
-| 🧠 **Session-based Context** | 채용 공고 정보를 ChromaDB에 저장하고, 세션 단위로 재사용 |
+| 🧠 **Session-based Context** | 채용 공고 정보를 FAISS에 저장하고, 세션 단위로 재사용 |
 | 💼 **Streamlit Interface** | 단일/배치 평가, 결과 시각화, CSV 다운로드 기능 제공 |
 | 🌍 **Multilingual Ready** | 영어 / 한국어 프롬프트 모두 지원 (추가 언어 확장 가능) |
 
@@ -40,7 +40,7 @@ HR Agent
 ├── graph_builder.py → LangGraph 파이프라인 구성
 ├── extractor.py → 이력서 텍스트 → 구조화 데이터 추출
 ├── scorer.py → 점수 계산 및 PASS/REJECT 결정
-├── session_store.py → ChromaDB 세션 저장소
+├── session_store.py → FAISS세션 저장소
 ├── job_context.py → 채용 공고 문맥 노드
 ├── loader.py → 이력서 로딩 (PDF/TXT)
 └── schemas.py → Pydantic 스키마 정의
@@ -101,7 +101,7 @@ streamlit run app.py
 | ------------------- | ---------------------------------------- |
 | **LLM & AI**        | OpenAI GPT-4o-mini, LangChain, LangGraph |
 | **Frontend**        | Streamlit                                |
-| **Vector DB**       | ChromaDB                                 |
+| **Vector DB**       | FAISS                                 |
 | **Backend / Logic** | Python 3.10+, Pydantic                   |
 | **Infra & Utils**   | dotenv, pandas, OpenAI Embeddings        |
 
