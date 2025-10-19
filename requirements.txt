@@ -11,4 +11,5 @@ typing_extensions>=4.15.0
 python-dotenv>=1.0.1
 streamlit>=1.50.0
 faiss-cpu>=1.8.0
+pypdf
 
